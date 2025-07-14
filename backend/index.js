@@ -19,32 +19,32 @@ app.get("/cars", async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
-        "Serial Number" AS id,
-        "Make" AS make,
-        "Model" AS model,
-        "Variant" AS variant,
-        "Color" AS color,
-        "Fuel Type" AS fuel_type,
-        "Registration Number" AS registration_number,
-        "Registration Date" AS registration_date,
-        "RC Status" AS rc_status,
-        "RC Expiry Date" AS rc_expiry_date,
-        "Chassis Number" AS chassis_number,
-        "Engine Number" AS engine_number,
-        "Manufacturing Year" AS manufacturing_year,
-        "Manufacturing Month" AS manufacturing_month,
-        "Owner Serial Number" AS owner_serial_number,
-        "Mileage (KM)" AS mileage,
-        "Cubic Capacity (CC)" AS cc,
-        "Emission Norms" AS emission_norms,
-        "Transmission Type" AS transmission,
-        "Vehicle Category" AS category,
-        "Insurance Type" AS insurance_type,
-        "Insurance Expiry Date" AS insurance_expiry,
-        "Estimated Selling Price" AS price,
-        "Ready for Sales" AS ready_for_sales
-      FROM car_stock
-      WHERE "Ready for Sales" = 'Yes'
+        serial_number AS id,
+        make,
+        model,
+        variant,
+        color,
+        fuel_type,
+        registration_number,
+        registration_date,
+        rc_status,
+        rc_expiry_date,
+        chassis_number,
+        engine_number,
+        manufacturing_year,
+        manufacturing_month,
+        owner_serial_number,
+        mileage_km AS mileage,
+        cubic_capacity_cc AS cc,
+        emission_norms,
+        transmission_type AS transmission,
+        vehicle_category AS category,
+        insurance_type,
+        insurance_expiry_date AS insurance_expiry,
+        estimated_selling_price AS price,
+        ready_for_sales
+      FROM car_stocks
+      WHERE ready_for_sales = 'Yes'
       LIMIT 50;
     `);
     res.json(result.rows);
@@ -64,19 +64,19 @@ app.get("/cars-by-brand", async (req, res) => {
     const result = await pool.query(
       `
       SELECT 
-        "Serial Number" AS id,
-        "Make" AS make,
-        "Model" AS model,
-        "Variant" AS variant,
-        "Color" AS color,
-        "Fuel Type" AS fuel_type,
-        "Transmission Type" AS transmission,
-        "Mileage (KM)" AS mileage,
-        "Manufacturing Year" AS manufacturing_year,
-        "Estimated Selling Price" AS price
-      FROM car_stock
-      WHERE "Make" = $1 AND "Ready for Sales" = 'Yes'
-      ORDER BY "Serial Number"
+        serial_number AS id,
+        make,
+        model,
+        variant,
+        color,
+        fuel_type,
+        transmission_type AS transmission,
+        mileage_km AS mileage,
+        manufacturing_year,
+        estimated_selling_price AS price
+      FROM car_stocks
+      WHERE make = $1 AND ready_for_sales = 'Yes'
+      ORDER BY serial_number
       LIMIT $2 OFFSET $3
     `,
       [brand, limit, offset]
@@ -93,24 +93,56 @@ app.get("/cars-by-brand", async (req, res) => {
 app.get("/brands", async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT DISTINCT "Make"
-      FROM car_stock
-      WHERE "Ready for Sales" = 'Yes'
-      ORDER BY "Make"
+      SELECT DISTINCT make
+      FROM car_stocks
+      WHERE ready_for_sales = 'Yes'
+      ORDER BY make
     `);
-    const brands = result.rows.map((row) => row.Make);
+    const brands = result.rows.map((row) => row.make);
     res.json(brands);
   } catch (err) {
     console.error("Error fetching brands:", err);
+    if (err && err.stack) {
+      console.error("Stack trace:", err.stack);
+    }
     res.status(500).send("Server Error");
   }
 });
 
 // ✅ Test Drive Booking Endpoint
-app.post("/test-drive", (req, res) => {
-  const { name, phone, preferredDate, carId } = req.body;
+app.post("/test-drive", async (req, res) => {
+  const { name, phone, licence, preferredTime, date, carId } = req.body;
   console.log("📥 Test drive request received:", req.body);
-  res.status(200).json({ message: "Test drive booked successfully" });
+  try {
+    // Fetch car name (make + model) from car_stocks
+    const carResult = await pool.query(
+      `SELECT make, model FROM car_stocks WHERE serial_number = $1`,
+      [carId]
+    );
+    if (carResult.rows.length === 0) {
+      return res.status(400).json({ message: "Invalid car ID" });
+    }
+    const carName = `${carResult.rows[0].make} ${carResult.rows[0].model}`;
+
+    // Insert booking into test_drive_bookings
+    await pool.query(
+      `INSERT INTO test_drive_bookings (customer_name, phone_number, has_license, car_name, test_drive_date, test_drive_time)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        name,
+        phone,
+        licence === 'yes',
+        carName,
+        date,
+        preferredTime || '00:00'
+      ]
+    );
+
+    res.status(200).json({ message: `🎉 Test drive booked for ${name}!` });
+  } catch (err) {
+    console.error("Error booking test drive:", err);
+    res.status(500).json({ message: "Failed to book test drive. Please try again later." });
+  }
 });
 
 // ✅ Start server
