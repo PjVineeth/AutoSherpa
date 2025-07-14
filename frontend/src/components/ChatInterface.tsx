@@ -1,6 +1,7 @@
 // src/components/ChatInterface.tsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Send } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { OptionButtons } from './OptionButtons';
 import { ContactForm } from './ContactForm';
@@ -17,28 +18,20 @@ export function ChatInterface() {
   const [brands, setBrands] = useState<string[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [carPage, setCarPage] = useState<number>(1);
-  // const [input, setInput] = useState(''); // Removed unused state
+  const [input, setInput] = useState('');
 
-  // @ts-ignore
-
+  // Use environment variable for API URL, fallback to localhost
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
     axios.get<string[]>(`${API_URL}/brands`)
       .then((r) => setBrands(r.data))
-      .catch((e) => {
-        setBrands([]);
-        setMessages((m) => [
-          ...m,
-          { id: Date.now().toString(), type: 'bot', content: '⚠️ Failed to load car brands. Please try again later.' }
-        ]);
-        console.error("Error fetching brands:", e);
-      });
+      .catch((e) => console.error("Error fetching brands:", e));
 
     const init = chatWorkflow.welcome.message;
     const text = typeof init === 'function' ? init(userData) : init;
     setMessages([{ id: Date.now().toString(), type: 'bot', content: text }]);
-  }, [API_URL, userData]); // Added missing dependencies
+  }, []);
 
   const addBot = (text: string) =>
     setMessages((m) => [...m, { id: Date.now().toString(), type: 'bot', content: text }]);
@@ -135,18 +128,11 @@ export function ChatInterface() {
       ...prev,
       name: data.name,
       phone: data.phone,
-      licence: data.licence,
-      preferredTime: data.preferredTime,
-      date: data.date,
-      carId: userData.selectedCarId,
+      time: data.time || 'To be confirmed',
     }));
 
     await axios.post(`${API_URL}/test-drive`, {
-      name: data.name,
-      phone: data.phone,
-      licence: data.licence,
-      preferredTime: data.preferredTime,
-      date: data.date,
+      ...data,
       carId: userData.selectedCarId,
     });
 
