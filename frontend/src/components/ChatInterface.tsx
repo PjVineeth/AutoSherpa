@@ -17,7 +17,7 @@ export function ChatInterface() {
   const [brands, setBrands] = useState<string[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [carPage, setCarPage] = useState<number>(1);
-  const [input, setInput] = useState('');
+  // const [input, setInput] = useState(''); // Removed unused state
 
   // @ts-ignore
 
@@ -38,7 +38,7 @@ export function ChatInterface() {
     const init = chatWorkflow.welcome.message;
     const text = typeof init === 'function' ? init(userData) : init;
     setMessages([{ id: Date.now().toString(), type: 'bot', content: text }]);
-  }, []);
+  }, [API_URL, userData]); // Added missing dependencies
 
   const addBot = (text: string) =>
     setMessages((m) => [...m, { id: Date.now().toString(), type: 'bot', content: text }]);
